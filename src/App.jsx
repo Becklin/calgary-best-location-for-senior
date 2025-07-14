@@ -134,7 +134,6 @@ function App() {
 
     const onSearchComplete = async (e) => {
       if (graphicsLayer?.graphics?.length) graphicsLayer.removeAll();
-
       const results = e.detail.results;
       if (results && results.length > 0) {
         const firstResult = results[0];
@@ -143,13 +142,10 @@ function App() {
 
         const hospitalSymbol = {
           type: "simple-marker",
-          style: "triangle",
-          color: "#e74c3c",
-          size: 10,
-          outline: {
-            color: "#ffffff",
-            width: 1,
-          },
+          style: "square",
+          color: "#388eff",
+          size: 8,
+          outline: null,
         };
         const parkSymbol = {
           type: "simple-fill",
@@ -160,12 +156,9 @@ function App() {
         const trainStationsSymbol = {
           type: "simple-marker",
           style: "square",
-          color: "#ffffff",
-          size: 10,
-          outline: {
-            color: "gray",
-            width: 1,
-          },
+          color: "#692531",
+          size: 5,
+          outline: null,
         };
         const layersWithStyles = [
           { layer: hospitalsLayer, symbol: hospitalSymbol, counts: 0 },
@@ -228,7 +221,7 @@ function App() {
           geometry: buffer,
           symbol: {
             type: "simple-fill",
-            color: [0, 0, 255, 0.1],
+            color: [0, 255, 255, 0.2],
             outline: null,
           },
         });
@@ -236,6 +229,12 @@ function App() {
         graphicsLayer = new GraphicsLayer();
         graphicsLayer.addMany([bufferGraphic, pointGraphic, ...servicesInBuffer]);
         map.add(graphicsLayer);
+        //override the default search view to the current map view
+        searchRef.current.view.goTo({
+          target: e.detail.results[0].results[0].feature.geometry,
+          zoom: 13,
+        })
+
         setCounts({
           hospitals: layersWithStyles[0].counts,
           parks: layersWithStyles[1].counts,
@@ -274,7 +273,8 @@ function App() {
       >
         <arcgis-search
           ref={searchRef}
-          zoom-scale="15000"
+          popupDisabled="true"
+          label="Search for a location"
           style={{
             width: "300px",
           }}
