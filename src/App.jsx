@@ -5,10 +5,11 @@ import MapView from "@arcgis/core/views/MapView.js";
 import GeoJSONLayer from "@arcgis/core/layers/GeoJSONLayer";
 import Graphic from "@arcgis/core/Graphic";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer";
+import FeatureLayer from "@arcgis/core/layers/FeatureLayer";
+import LabelClass from "@arcgis/core/layers/support/LabelClass";
 import * as geometryEngine from "@arcgis/core/geometry/geometryEngine";
 import * as intersectionOperator from "@arcgis/core/geometry/operators/intersectionOperator.js";
 import * as projection from "@arcgis/core/geometry/projection";
-
 await projection.load();
 
 import "@arcgis/map-components";
@@ -21,7 +22,6 @@ import "./App.css";
 defineCustomElements(window);
 defineMapElements(window);
 
-
 function App() {
   const [counts, setCounts] = React.useState({
     hospitals: 0,
@@ -32,6 +32,7 @@ function App() {
   const mapRef = useRef(null);
 
   let graphicsLayer = null;
+  let featureLayer = null;
 
   useEffect(() => {
     const hospitalsLayer = new GeoJSONLayer({
@@ -45,19 +46,6 @@ function App() {
           <b>Type:</b> {type}
         `,
       },
-      renderer: {
-        type: "simple",
-        symbol: {
-          type: "simple-marker",
-          style: "triangle",
-          color: "#e74c3c",
-          size: 10,
-          outline: {
-            color: "#ffffff",
-            width: 1,
-          },
-        },
-      },
       copyright: "City of Calgary",
     });
     const parksLayer = new GeoJSONLayer({
@@ -67,15 +55,6 @@ function App() {
         title: "{site_name}",
         content: `<b>Type:</b> {PLANNING_CATEGORY}<br/>`,
       },
-      renderer: {
-        type: "simple",
-        symbol: {
-          type: "simple-fill",
-          color: [34, 139, 34, 0.3],
-          style: "solid",
-          outline: null,
-        },
-      },
       copyright: "City of Calgary",
     });
     const trainStationsLayer = new GeoJSONLayer({
@@ -84,19 +63,6 @@ function App() {
       popupTemplate: {
         title: "{STATIONNAM}",
         content: `<b>Type:</b> {PLANNING_CATEGORY}<br/>`,
-      },
-      renderer: {
-        type: "simple",
-        symbol: {
-          type: "simple-marker",
-          style: "square",
-          color: "#white",
-          size: 10,
-          outline: {
-            color: "gray",
-            width: 1,
-          },
-        },
       },
       copyright: "City of Calgary",
     });
@@ -121,9 +87,9 @@ function App() {
           xmin: -114.3,
           ymin: 50.8,
           xmax: -113.8,
-          ymax: 51.2
-        }
-      }
+          ymax: 51.2,
+        },
+      },
     });
 
     view.when(() => {
@@ -134,6 +100,9 @@ function App() {
 
     const onSearchComplete = async (e) => {
       if (graphicsLayer?.graphics?.length) graphicsLayer.removeAll();
+      console.log(featureLayer);
+      if (featureLayer?.source?.length) featureLayer.source = [];
+
       const results = e.detail.results;
       if (results && results.length > 0) {
         const firstResult = results[0];
@@ -163,18 +132,37 @@ function App() {
         const layersWithStyles = [
           { layer: hospitalsLayer, symbol: hospitalSymbol, counts: 0 },
           { layer: parksLayer, symbol: parkSymbol, counts: 0 },
-          { layer: trainStationsLayer, symbol:  trainStationsSymbol, counts: 0 },
+          { layer: trainStationsLayer, symbol: trainStationsSymbol, counts: 0 },
         ];
 
-        let servicesInBuffer = [];
         let graphicsInBuffer = [];
+        const labelClass = {
+          labelPlacement: "above-center",
+          labelExpressionInfo: {
+            expression: "$feature.name", // ✅ 要對應 attributes 裡的欄位
+          },
+          symbol: {
+            type: "text", // autocasts as new TextSymbol()
+            color: "white",
+            haloColor: "rgba(66, 66, 66, 0.75)",  // 模擬背景色的光暈色
+            haloSize: "2px",
+            font: {
+              family: "arial",
+              size: 8,
+              weight: "bold",
+            },
+          },
+          maxScale: 0,
+          minScale: 40000,
+        };
+
         for (let i = 0; i < layersWithStyles.length; i++) {
           const { layer, symbol } = layersWithStyles[i];
-
           const features = await layer.queryFeatures();
-          const filtered = features.features.filter(f => {
+          const filtered = features.features.filter((f) => {
             if (
-              f.geometry.spatialReference?.wkid !== buffer.spatialReference?.wkid
+              f.geometry.spatialReference?.wkid !==
+              buffer.spatialReference?.wkid
             ) {
               buffer = projection.project(buffer, f.geometry.spatialReference);
             }
@@ -188,14 +176,40 @@ function App() {
 
           layersWithStyles[i].counts = filtered.length;
 
-          graphicsInBuffer = filtered.map(f => new Graphic({
-            geometry: f.geometry,
-            attributes: f.attributes,
-            symbol: symbol,
-            popupTemplate: f.popupTemplate,
-          }));
+          graphicsInBuffer = filtered.map((f, index) => {
+            console.log(f.attributes);
+            return new Graphic({
+              geometry: f.geometry,
+              attributes: {
+                ...f.attributes,
+                ObjectID: index,
+                name:
+                  f.attributes.site_name ||
+                  f.attributes.name ||
+                  f.attributes.stationnam,
+              },
+              popupTemplate: f.popupTemplate,
+            });
+          });
 
-          servicesInBuffer.push(...graphicsInBuffer);
+          const featurelayer = new FeatureLayer({
+            source: graphicsInBuffer,
+            objectIdField: "ObjectID",
+            fields: [
+              { name: "ObjectID", type: "oid" },
+              { name: "name", type: "string" },
+            ],
+            renderer: {
+              type: "simple",
+              symbol: symbol,
+            },
+            labelingInfo: [labelClass],
+            labelsVisible: true,
+            popupTemplate: {
+              content: "G式的",
+            },
+          });
+          map.add(featurelayer);
         }
         const pointGraphic = new Graphic({
           geometry: point,
@@ -227,13 +241,14 @@ function App() {
         });
 
         graphicsLayer = new GraphicsLayer();
-        graphicsLayer.addMany([bufferGraphic, pointGraphic, ...servicesInBuffer]);
+        graphicsLayer.addMany([bufferGraphic, pointGraphic]);
+
         map.add(graphicsLayer);
         //override the default search view to the current map view
         searchRef.current.view.goTo({
           target: e.detail.results[0].results[0].feature.geometry,
           zoom: 13,
-        })
+        });
 
         setCounts({
           hospitals: layersWithStyles[0].counts,
@@ -288,10 +303,16 @@ function App() {
             overflowY: "hidden",
           }}
         >
-          <div style={{padding: "0.5rem"}}>
-            <p><span>Hospitals:</span> {counts.hospitals}</p>
-            <p><span>Parks:</span> {counts.parks}</p>
-            <p><span>Train Stations:</span> {counts.trainStations}</p>
+          <div style={{ padding: "0.5rem" }}>
+            <p>
+              <span>Hospitals:</span> {counts.hospitals}
+            </p>
+            <p>
+              <span>Parks:</span> {counts.parks}
+            </p>
+            <p>
+              <span>Train Stations:</span> {counts.trainStations}
+            </p>
           </div>
         </calcite-panel>
       </div>
