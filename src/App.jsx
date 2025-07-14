@@ -100,9 +100,14 @@ function App() {
 
     const onSearchComplete = async (e) => {
       if (graphicsLayer?.graphics?.length) graphicsLayer.removeAll();
-      console.log(featureLayer);
-      if (featureLayer?.source?.length) featureLayer.source = [];
-
+      // copy the collection，avoid modifying the original collection
+      const layersToRemove = map.layers.toArray().filter(layer => layer.type === "feature");
+      if (layersToRemove.length > 0) {
+        layersToRemove.forEach(layer => {
+          map.remove(layer);
+          layer.destroy();
+        });
+      }
       const results = e.detail.results;
       if (results && results.length > 0) {
         const firstResult = results[0];
@@ -139,12 +144,12 @@ function App() {
         const labelClass = {
           labelPlacement: "above-center",
           labelExpressionInfo: {
-            expression: "$feature.name", // ✅ 要對應 attributes 裡的欄位
+            expression: "$feature.name",
           },
           symbol: {
             type: "text", // autocasts as new TextSymbol()
             color: "white",
-            haloColor: "rgba(66, 66, 66, 0.75)",  // 模擬背景色的光暈色
+            haloColor: "rgba(66, 66, 66, 0.75)",
             haloSize: "2px",
             font: {
               family: "arial",
@@ -177,7 +182,6 @@ function App() {
           layersWithStyles[i].counts = filtered.length;
 
           graphicsInBuffer = filtered.map((f, index) => {
-            console.log(f.attributes);
             return new Graphic({
               geometry: f.geometry,
               attributes: {
