@@ -112,6 +112,18 @@ function App() {
       map,
       center: [-114.0719, 51.0447],
       zoom: 12,
+      constraints: {
+        minZoom: 10,
+        maxZoom: 17,
+        geometry: {
+          type: "extent",
+          spatialReference: { wkid: 4326 },
+          xmin: -114.3,
+          ymin: 50.8,
+          xmax: -113.8,
+          ymax: 51.2
+        }
+      }
     });
 
     view.when(() => {
@@ -128,34 +140,44 @@ function App() {
         const firstResult = results[0];
         const point = firstResult.results[0].feature.geometry;
         let buffer = geometryEngine.buffer(point, 3000, "meters");
-        const pointGraphic = new Graphic({
-          geometry: point,
-          symbol: {
-            type: "simple-marker",
-            color: "blue",
-            size: 8,
+
+        const hospitalSymbol = {
+          type: "simple-marker",
+          style: "triangle",
+          color: "#e74c3c",
+          size: 10,
+          outline: {
+            color: "#ffffff",
+            width: 1,
           },
-        });
-
-        const bufferGraphic = new Graphic({
-          geometry: buffer,
-          symbol: {
-            type: "simple-fill",
-            color: [0, 0, 255, 0.1],
-            outline: {
-              color: [0, 0, 255],
-              width: 1,
-            },
+        };
+        const parkSymbol = {
+          type: "simple-fill",
+          color: [34, 139, 34, 0.3],
+          style: "solid",
+          outline: null,
+        };
+        const trainStationsSymbol = {
+          type: "simple-marker",
+          style: "square",
+          color: "#ffffff",
+          size: 10,
+          outline: {
+            color: "gray",
+            width: 1,
           },
-        });
+        };
+        const layersWithStyles = [
+          { layer: hospitalsLayer, symbol: hospitalSymbol, counts: 0 },
+          { layer: parksLayer, symbol: parkSymbol, counts: 0 },
+          { layer: trainStationsLayer, symbol:  trainStationsSymbol, counts: 0 },
+        ];
 
-        graphicsLayer = new GraphicsLayer();
-        graphicsLayer.addMany([bufferGraphic, pointGraphic]);
-
-        const layers = [hospitalsLayer, parksLayer, trainStationsLayer];
         let servicesInBuffer = [];
+        let graphicsInBuffer = [];
+        for (let i = 0; i < layersWithStyles.length; i++) {
+          const { layer, symbol } = layersWithStyles[i];
 
-        for (const layer of layers) {
           const features = await layer.queryFeatures();
           const filtered = features.features.filter(f => {
             if (
@@ -164,26 +186,61 @@ function App() {
               buffer = projection.project(buffer, f.geometry.spatialReference);
             }
             try {
-              const result = intersectionOperator.execute(f.geometry, buffer);
-              return result;
+              return intersectionOperator.execute(f.geometry, buffer);
             } catch (err) {
               console.warn("No intersect", err);
               return false;
             }
           });
 
-          servicesInBuffer.push(...filtered);
-        }
-        const featuresGraphics = servicesInBuffer.map((f) => {
-          return new Graphic({
+          layersWithStyles[i].counts = filtered.length;
+
+          graphicsInBuffer = filtered.map(f => new Graphic({
             geometry: f.geometry,
             attributes: f.attributes,
+            symbol: symbol,
             popupTemplate: f.popupTemplate,
-          });
+          }));
+
+          servicesInBuffer.push(...graphicsInBuffer);
+        }
+        const pointGraphic = new Graphic({
+          geometry: point,
+          symbol: {
+            type: "simple-marker",
+            color: "gray",
+            size: 4,
+          },
+          popupTemplate: {
+            title: "Search Result",
+            content: `
+              <div>
+                <h3>You searched for: <strong>${firstResult.results[0].name}</strong></h3>
+                <p style="color: gray;">Hospitals: ${layersWithStyles[0].counts}</p>
+                <p style="color: gray;">Parks: ${layersWithStyles[1].counts}</p>
+                <p style="color: gray;">Train Stations: ${layersWithStyles[2].counts}</p>
+              </div>
+            `,
+          },
         });
 
-        graphicsLayer.addMany(featuresGraphics);
+        const bufferGraphic = new Graphic({
+          geometry: buffer,
+          symbol: {
+            type: "simple-fill",
+            color: [0, 0, 255, 0.1],
+            outline: null,
+          },
+        });
+
+        graphicsLayer = new GraphicsLayer();
+        graphicsLayer.addMany([bufferGraphic, pointGraphic, ...servicesInBuffer]);
         map.add(graphicsLayer);
+        setCounts({
+          hospitals: layersWithStyles[0].counts,
+          parks: layersWithStyles[1].counts,
+          trainStations: layersWithStyles[2].counts,
+        });
       }
     };
 
@@ -204,17 +261,40 @@ function App() {
   return (
     <>
       <div ref={mapRef} style={{ height: "100vh", width: "100vw" }}></div>
-      <arcgis-search
-        ref={searchRef}
-        zoom-scale="15000"
+      <div
         style={{
+          display: "flex",
+          flexDirection: "column",
           position: "absolute",
-          top: 10,
-          right: 10,
+          top: "10px",
+          right: "10px",
           zIndex: 10,
-          width: "300px",
+          gap: "10px",
         }}
-      ></arcgis-search>
+      >
+        <arcgis-search
+          ref={searchRef}
+          zoom-scale="15000"
+          style={{
+            width: "300px",
+          }}
+        ></arcgis-search>
+
+        <calcite-panel
+          heading="Search Results"
+          style={{
+            width: "300px",
+            maxHeight: "250px",
+            overflowY: "hidden",
+          }}
+        >
+          <div style={{padding: "0.5rem"}}>
+            <p><span>Hospitals:</span> {counts.hospitals}</p>
+            <p><span>Parks:</span> {counts.parks}</p>
+            <p><span>Train Stations:</span> {counts.trainStations}</p>
+          </div>
+        </calcite-panel>
+      </div>
     </>
   );
 }
