@@ -6,7 +6,6 @@ import GeoJSONLayer from "@arcgis/core/layers/GeoJSONLayer";
 import Graphic from "@arcgis/core/Graphic";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer";
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer";
-import LabelClass from "@arcgis/core/layers/support/LabelClass";
 import * as geometryEngine from "@arcgis/core/geometry/geometryEngine";
 import * as intersectionOperator from "@arcgis/core/geometry/operators/intersectionOperator.js";
 import * as projection from "@arcgis/core/geometry/projection";
@@ -105,7 +104,7 @@ function App() {
           type: "simple-marker",
           style: "square",
           color: "#388eff",
-          size: 8,
+          size: 16,
           outline: null,
         };
         const parkSymbol = {
@@ -118,7 +117,7 @@ function App() {
           type: "simple-marker",
           style: "square",
           color: "#692531",
-          size: 5,
+          size: 8,
           outline: null,
         };
 
@@ -283,19 +282,7 @@ function App() {
             width: "300px",
           }}
         ></arcgis-search>
-
-        {searched && <calcite-panel
-          heading="Search Results"
-          style={{
-            width: "300px",
-            padding: "12px",
-            backgroundColor: "white",
-            boxShadow: "0 2px 10px rgba(0, 0, 0, 0.1)",
-            overflowY: "hidden",
-          }}
-        >
-          <LocationScoreWidget address={address} counts={counts} />
-        </calcite-panel>}
+        {searched && <LocationScoreWidget address={address} counts={counts} />}
       </div>
     </>
   );
