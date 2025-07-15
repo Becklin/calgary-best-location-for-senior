@@ -29,7 +29,7 @@ function App() {
     parks: 0,
     trainStations: 0,
   });
-
+  const [address, setAddress] = React.useState("");
   const [searched, setSearched] = React.useState(false);
   const searchRef = useRef(null);
   const mapRef = useRef(null);
@@ -40,32 +40,16 @@ function App() {
     const hospitalsLayer = new GeoJSONLayer({
       url: "https://data.calgary.ca/resource/x34e-bcjz.geojson?$where=type='Hospital' OR type='PHS Clinic'",
       visible: false,
-      popupTemplate: {
-        title: "{name}",
-        content: `
-          <b>Address:</b> {address}<br/>
-          <b>Community:</b> {comm_code}<br/>
-          <b>Type:</b> {type}
-        `,
-      },
       copyright: "City of Calgary",
     });
     const parksLayer = new GeoJSONLayer({
       url: "/data/Parks Sites_20250711.geojson",
       visible: false,
-      popupTemplate: {
-        title: "{site_name}",
-        content: `<b>Type:</b> {PLANNING_CATEGORY}<br/>`,
-      },
       copyright: "City of Calgary",
     });
     const trainStationsLayer = new GeoJSONLayer({
       url: "https://data.calgary.ca/resource/2axz-xm4q.geojson",
       visible: false,
-      popupTemplate: {
-        title: "{STATIONNAM}",
-        content: `<b>Type:</b> {PLANNING_CATEGORY}<br/>`,
-      },
       copyright: "City of Calgary",
     });
     const searchElm = searchRef.current;
@@ -114,6 +98,7 @@ function App() {
       if (results && results.length > 0) {
         const firstResult = results[0];
         const point = firstResult.results[0].feature.geometry;
+        const address = firstResult.results[0].name;
         let buffer = geometryEngine.buffer(point, 3000, "meters");
 
         const hospitalSymbol = {
@@ -136,12 +121,12 @@ function App() {
           size: 5,
           outline: null,
         };
-        const layersWithStyles = [
-          { layer: hospitalsLayer, symbol: hospitalSymbol, counts: 0 },
-          { layer: parksLayer, symbol: parkSymbol, counts: 0 },
-          { layer: trainStationsLayer, symbol: trainStationsSymbol, counts: 0 },
-        ];
 
+        const layersWithStyles = {
+          hospital: { layer: hospitalsLayer, symbol: hospitalSymbol, counts: 0 },
+          park: { layer: parksLayer, symbol: parkSymbol, counts: 0 },
+          trainStation: { layer: trainStationsLayer, symbol: trainStationsSymbol, counts: 0 },
+        };
         let graphicsInBuffer = [];
         const labelClass = {
           labelPlacement: "above-center",
@@ -149,7 +134,7 @@ function App() {
             expression: "$feature.name",
           },
           symbol: {
-            type: "text", // autocasts as new TextSymbol()
+            type: "text",
             color: "white",
             haloColor: "rgba(66, 66, 66, 0.75)",
             haloSize: "2px",
@@ -163,8 +148,8 @@ function App() {
           minScale: 40000,
         };
 
-        for (let i = 0; i < layersWithStyles.length; i++) {
-          const { layer, symbol } = layersWithStyles[i];
+        for (const key in layersWithStyles) {
+          const { layer, symbol } = layersWithStyles[key];
           const features = await layer.queryFeatures();
           const filtered = features.features.filter((f) => {
             if (
@@ -181,10 +166,9 @@ function App() {
             }
           });
 
-          layersWithStyles[i].counts = filtered.length;
+          layersWithStyles[key].counts = filtered.length;
 
-          graphicsInBuffer = filtered.map((f, index) => {
-            return new Graphic({
+          graphicsInBuffer = filtered.map((f, index) => (new Graphic({
               geometry: f.geometry,
               attributes: {
                 ...f.attributes,
@@ -195,8 +179,8 @@ function App() {
                   f.attributes.stationnam,
               },
               popupTemplate: f.popupTemplate,
-            });
-          });
+            }))
+          );
 
           const featurelayer = new FeatureLayer({
             source: graphicsInBuffer,
@@ -226,9 +210,9 @@ function App() {
             content: `
               <div>
                 <h3>You searched for: <strong>${firstResult.results[0].name}</strong></h3>
-                <p style="color: gray;">Hospitals: ${layersWithStyles[0].counts}</p>
-                <p style="color: gray;">Parks: ${layersWithStyles[1].counts}</p>
-                <p style="color: gray;">Train Stations: ${layersWithStyles[2].counts}</p>
+                <p style="color: gray;">Hospitals: ${layersWithStyles.hospital.counts}</p>
+                <p style="color: gray;">Parks: ${layersWithStyles.park.counts}</p>
+                <p style="color: gray;">Train Stations: ${layersWithStyles.trainStation.counts}</p>
               </div>
             `,
           },
@@ -254,10 +238,11 @@ function App() {
         });
 
         setCounts({
-          hospitals: layersWithStyles[0].counts,
-          parks: layersWithStyles[1].counts,
-          trainStations: layersWithStyles[2].counts,
+          hospitals: layersWithStyles.hospital.counts,
+          parks: layersWithStyles.park.counts,
+          trainStations: layersWithStyles.trainStation.counts,
         });
+        setAddress(address);
         setSearched(true);
       }
     };
@@ -309,7 +294,7 @@ function App() {
             overflowY: "hidden",
           }}
         >
-          <LocationScoreWidget counts={counts} />
+          <LocationScoreWidget address={address} counts={counts} />
         </calcite-panel>}
       </div>
     </>

@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function LocationScoreWidget({ counts }) {
+export default function LocationScoreWidget({ address, counts }) {
     if (!counts || Object.keys(counts).length === 0) {
         return <div style={{ padding: 16 }}>No data available</div>;
     }
@@ -25,7 +25,7 @@ export default function LocationScoreWidget({ counts }) {
 
   return (
     <div style={{ width: '100%', backgroundColor: 'white' }}>
-      <h3>Result</h3>
+      <h3>{address}</h3>
       <p>Hospital: {counts.hospitals} </p>
       <p>Park: {counts.parks} </p>
       <p>Train Station: {counts.trainStations} </p>
