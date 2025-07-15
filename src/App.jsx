@@ -17,6 +17,7 @@ import { defineCustomElements } from "@esri/calcite-components/loader";
 import { defineCustomElements as defineMapElements } from "@arcgis/map-components/dist/loader";
 import "@esri/calcite-components/dist/calcite/calcite.css";
 
+import LocationScoreWidget from "./LocationScoreWidget";
 import "./App.css";
 
 defineCustomElements(window);
@@ -28,11 +29,12 @@ function App() {
     parks: 0,
     trainStations: 0,
   });
+
+  const [searched, setSearched] = React.useState(false);
   const searchRef = useRef(null);
   const mapRef = useRef(null);
 
   let graphicsLayer = null;
-  let featureLayer = null;
 
   useEffect(() => {
     const hospitalsLayer = new GeoJSONLayer({
@@ -49,7 +51,7 @@ function App() {
       copyright: "City of Calgary",
     });
     const parksLayer = new GeoJSONLayer({
-      url: "/public/data/Parks Sites_20250711.geojson",
+      url: "/data/Parks Sites_20250711.geojson",
       visible: false,
       popupTemplate: {
         title: "{site_name}",
@@ -209,9 +211,6 @@ function App() {
             },
             labelingInfo: [labelClass],
             labelsVisible: true,
-            popupTemplate: {
-              content: "G式的",
-            },
           });
           map.add(featurelayer);
         }
@@ -259,6 +258,7 @@ function App() {
           parks: layersWithStyles[1].counts,
           trainStations: layersWithStyles[2].counts,
         });
+        setSearched(true);
       }
     };
 
@@ -299,26 +299,18 @@ function App() {
           }}
         ></arcgis-search>
 
-        <calcite-panel
+        {searched && <calcite-panel
           heading="Search Results"
           style={{
             width: "300px",
-            maxHeight: "250px",
+            padding: "12px",
+            backgroundColor: "white",
+            boxShadow: "0 2px 10px rgba(0, 0, 0, 0.1)",
             overflowY: "hidden",
           }}
         >
-          <div style={{ padding: "0.5rem" }}>
-            <p>
-              <span>Hospitals:</span> {counts.hospitals}
-            </p>
-            <p>
-              <span>Parks:</span> {counts.parks}
-            </p>
-            <p>
-              <span>Train Stations:</span> {counts.trainStations}
-            </p>
-          </div>
-        </calcite-panel>
+          <LocationScoreWidget counts={counts} />
+        </calcite-panel>}
       </div>
     </>
   );
