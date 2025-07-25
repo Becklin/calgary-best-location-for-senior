@@ -121,36 +121,66 @@ function App() {
           outline: null,
         };
 
-        const layersWithStyles = {
-          hospital: { layer: hospitalsLayer, symbol: hospitalSymbol, counts: 0 },
-          park: { layer: parksLayer, symbol: parkSymbol, counts: 0 },
-          trainStation: { layer: trainStationsLayer, symbol: trainStationsSymbol, counts: 0 },
-        };
-        let graphicsInBuffer = [];
-        const labelClass = {
-          labelPlacement: "above-center",
-          labelExpressionInfo: {
-            expression: "$feature.name",
-          },
+        const hospitalLabelClass = {
+          labelExpressionInfo: { expression: "$feature.name" },
           symbol: {
             type: "text",
-            color: "white",
-            haloColor: "rgba(66, 66, 66, 0.75)",
-            haloSize: "2px",
+            color: "black",
+            haloColor: "white",
+            haloSize: "1px",
             font: {
-              family: "arial",
-              size: 8,
-              weight: "bold",
+              size: "12px",
+              family: "sans-serif",
             },
           },
-          maxScale: 0,
-          minScale: 40000,
+          labelPlacement: "above-center"
+        };
+
+        const parkLabelClass = {
+          labelExpressionInfo: { expression: "$feature.name" },
+          symbol: {
+            type: "text",
+            color: "black",
+            haloColor: "white",
+            haloSize: "1px",
+            font: {
+              size: "12px",
+              family: "sans-serif",
+            },
+          },
+          labelPlacement: "center-center"
+        };
+
+
+        const stationLabelClass = {
+          labelExpressionInfo: { expression: "$feature.name" },
+          symbol: {
+            type: "text",
+            color: "black",
+            haloColor: "white",
+            haloSize: "1px",
+            font: {
+              size: "12px",
+              family: "sans-serif",
+            },
+          },
+          labelPlacement: "above-center"
+        };
+
+        const layersWithStyles = {
+          hospital: { layer: hospitalsLayer, labelClass: hospitalLabelClass, symbol: hospitalSymbol, counts: 0 },
+          park: { layer: parksLayer, labelClass: parkLabelClass, symbol: parkSymbol, counts: 0 },
+          trainStation: { layer: trainStationsLayer, labelClass: stationLabelClass, symbol: trainStationsSymbol, counts: 0 },
         };
 
         for (const key in layersWithStyles) {
-          const { layer, symbol } = layersWithStyles[key];
+          const { layer, symbol, labelClass } = layersWithStyles[key];
           const features = await layer.queryFeatures();
           const filtered = features.features.filter((f) => {
+            const name = f.attributes.site_name ||
+                  f.attributes.name ||
+                  f.attributes.stationnam || "No Name";
+
             if (
               f.geometry.spatialReference?.wkid !==
               buffer.spatialReference?.wkid
@@ -167,7 +197,7 @@ function App() {
 
           layersWithStyles[key].counts = filtered.length;
 
-          graphicsInBuffer = filtered.map((f, index) => (new Graphic({
+          const graphicsInBuffer = filtered.map((f, index) => (new Graphic({
               geometry: f.geometry,
               attributes: {
                 ...f.attributes,
@@ -175,7 +205,7 @@ function App() {
                 name:
                   f.attributes.site_name ||
                   f.attributes.name ||
-                  f.attributes.stationnam,
+                  f.attributes.stationnam || "No Name"
               },
               popupTemplate: f.popupTemplate,
             }))
@@ -186,15 +216,16 @@ function App() {
             objectIdField: "ObjectID",
             fields: [
               { name: "ObjectID", type: "oid" },
-              { name: "name", type: "string" },
+              { name: "name", alias: "Display Name", type: "string" },
             ],
             renderer: {
               type: "simple",
               symbol: symbol,
             },
-            labelingInfo: [labelClass],
+            // labelingInfo: [labelClass],
             labelsVisible: true,
           });
+
           map.add(featurelayer);
         }
         const pointGraphic = new Graphic({
